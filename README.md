@@ -8,7 +8,7 @@ Each demo contained in this repository is documented on the Digilent Wiki, links
 
 | Name and Wiki Link | Description |
 |--------------------|-------------|
-| [Genesys2 FMC Pcam Adapter]() | Demonstrates the usage of the FMC Pcam Adapter as an interface from one up to four different Pcam cameras and the Genesys2 platform. |
+| [Genesys2 FMC Pcam Adapter](https://reference.digilentinc.com/reference/programmable-logic/genesys-2/demos/genesys-2_fmc-pcam-adapter_demo) | Demonstrates the usage of the FMC Pcam Adapter as an interface from one up to four different Pcam cameras and the Genesys2 platform. |
 
 ## Repository Description
 
