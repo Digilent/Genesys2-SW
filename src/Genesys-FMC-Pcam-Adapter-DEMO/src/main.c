@@ -63,6 +63,7 @@
 #include "MIPI_D_PHY_RX.h"
 #include "MIPI_CSI_2_RX.h"
 #include "platform/platform.h"
+#include "pmon/pmon.h"
 
 
 /* Hardware profile */
@@ -97,6 +98,18 @@
 #define CAM_CHANNEL_C 2
 #define CAM_CHANNEL_D 3
 
+double VDMA_0_READ_VAL;
+double VDMA_0_WRITE_VAL;
+
+double VDMA_1_READ_VAL;
+double VDMA_1_WRITE_VAL;
+
+double VDMA_2_READ_VAL;
+double VDMA_2_WRITE_VAL;
+
+double VDMA_3_READ_VAL;
+double VDMA_3_WRITE_VAL;
+
 XIic IicInstance;
 XGpio GpioInstance;
 XIntc IntcInstance;
@@ -124,10 +137,17 @@ uintptr_t const portd_offset 		= (1920*1080/2+1920/2)*3;
 
 static int input_pipeline_mode_change(uint8_t channel_mask, XAxiVdma *vdma_driver, XVideo_scaler *scaler, uint32_t frame_buf_base_addr_, Resolution HW_ScaledCaptureRes, Resolution VideoOutputRes, mode_t mode, uintptr_t dphy_baseaddr, uintptr_t csi2_baseaddr, uintptr_t gamma_baseaddr );
 static void output_pipeline_mode_change(XAxiVdma *vdma_driver, uint32_t frame_buf_base_addr_, Resolution VideoOutputRes, u8 master_select);
+static void perf_cnt();
 
 int main() {
 	//Init CPU, UART, caches etc.
     init_platform();
+
+    double total_bandwidth;
+    double total_mem_bandwidth;
+    double percent_of_bandwidth;
+
+    total_mem_bandwidth = (((800*32)/8)*2)*2;
 
     u8 read_master_select;
     XStatus status_a, status_b, status_c, status_d;
@@ -188,10 +208,10 @@ int main() {
     mux_reset(&IicInstance, 0);
     ov5640_reset(&GpioInstance);
 
-    status_a = input_pipeline_mode_change(CAM_CHANNEL_A, &Vdma_a, &scaler_a, frame_baseaddr, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps_336M_MIPI, XPAR_MIPI_D_PHY_RX_A_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_A_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_A_BASEADDR);
-    status_b = input_pipeline_mode_change(CAM_CHANNEL_B, &Vdma_b, &scaler_b, frame_baseaddr + portb_offset, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps_336M_MIPI, XPAR_MIPI_D_PHY_RX_B_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_B_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_B_BASEADDR);
-    status_c = input_pipeline_mode_change(CAM_CHANNEL_C, &Vdma_c, &scaler_c, frame_baseaddr + portc_offset, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps_336M_MIPI, XPAR_MIPI_D_PHY_RX_C_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_C_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_C_BASEADDR);
-    status_d = input_pipeline_mode_change(CAM_CHANNEL_D, &Vdma_d, &scaler_d, frame_baseaddr + portd_offset, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps_336M_MIPI, XPAR_MIPI_D_PHY_RX_D_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_D_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_D_BASEADDR);
+    status_a = input_pipeline_mode_change(CAM_CHANNEL_A, &Vdma_a, &scaler_a, frame_baseaddr, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps, XPAR_MIPI_D_PHY_RX_A_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_A_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_A_BASEADDR);
+    status_b = input_pipeline_mode_change(CAM_CHANNEL_B, &Vdma_b, &scaler_b, frame_baseaddr + portb_offset, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps, XPAR_MIPI_D_PHY_RX_B_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_B_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_B_BASEADDR);
+    status_c = input_pipeline_mode_change(CAM_CHANNEL_C, &Vdma_c, &scaler_c, frame_baseaddr + portc_offset, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps, XPAR_MIPI_D_PHY_RX_C_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_C_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_C_BASEADDR);
+    status_d = input_pipeline_mode_change(CAM_CHANNEL_D, &Vdma_d, &scaler_d, frame_baseaddr + portd_offset, R960_540_60_PP, R1920_1080_60_PP, MODE_1080P_1920_1080_30fps, XPAR_MIPI_D_PHY_RX_D_S_AXI_LITE_BASEADDR, XPAR_MIPI_CSI_2_RX_D_S_AXI_LITE_BASEADDR, XPAR_AXI_GAMMACORRECTION_D_BASEADDR);
 
     if (status_a == XST_SUCCESS){
     	read_master_select = 0x00;
@@ -207,6 +227,36 @@ int main() {
     }
 
     output_pipeline_mode_change(&Vdma_a, frame_baseaddr, R1920_1080_60_PP, read_master_select);
+
+
+    axi_perf_mon_config();
+
+    //Init global vars to 0
+    VDMA_0_READ_VAL = 0;
+    VDMA_0_WRITE_VAL = 0;
+
+    VDMA_1_READ_VAL = 0;
+    VDMA_1_WRITE_VAL = 0;
+
+    VDMA_2_READ_VAL = 0;
+    VDMA_2_WRITE_VAL = 0;
+
+    VDMA_3_READ_VAL = 0;
+    VDMA_3_WRITE_VAL = 0;
+
+    perf_cnt();
+    xil_printf("\r\n");
+
+    total_bandwidth = VDMA_0_READ_VAL + VDMA_0_WRITE_VAL + VDMA_1_READ_VAL + VDMA_1_WRITE_VAL + VDMA_2_READ_VAL + VDMA_2_WRITE_VAL + VDMA_3_READ_VAL + VDMA_3_WRITE_VAL;
+    total_bandwidth = total_bandwidth;
+
+    percent_of_bandwidth = (total_bandwidth/total_mem_bandwidth) * 100;
+
+    printf("System Total Bandwidth = %f MB/s\r\n",total_bandwidth);
+    printf("DDR3 Theoretical Bandwidth = %f MB/s\r\n",total_mem_bandwidth);
+    printf("Percent of DDR3 Theoretical Bandwidth = %f%%\r\n",percent_of_bandwidth);
+
+
 
     cleanup_platform();
     return 0;
@@ -267,4 +317,106 @@ void output_pipeline_mode_change(XAxiVdma *vdma_driver, uint32_t frame_buf_base_
 		vtc_enable(&sVtc_);
 		enableRead(vdma_driver);
 	}
+}
+
+void perf_cnt()
+{
+	double HP0_read;
+	double HP0_write;
+	double HP0_read_dec;
+	double HP0_write_dec;
+
+	double HP1_read;
+	double HP1_write;
+	double HP1_read_dec;
+	double HP1_write_dec;
+
+	double HP2_read;
+	double HP2_write;
+	double HP2_read_dec;
+	double HP2_write_dec;
+
+	double HP3_read;
+	double HP3_write;
+	double HP3_read_dec;
+	double HP3_write_dec;
+
+
+	int intr = 0;
+	// reset
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x300, 0x00000202);
+
+	//Enable counters
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x300, 0x00000101);
+
+	// Interval counter load
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x28, 0x2); //Load
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x28, 0x0); // Deactivate load
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x28, 0x101); // Enable the counter
+
+	intr = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x0038); // Read Intr Status Reg
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x0038, intr);//Clear Intr status
+
+
+	intr = 0;
+	while ((intr & 0x00000002) == 0)
+	{
+		intr = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x0038); // Read Intr Status Reg
+
+	}
+	Xil_Out32(XPAR_AXIPMON_0_BASEADDR+0x0038, intr);//Clear Intr status
+
+	//Obtain counters for each AXI monitor interface
+	//And Compute bandwidth in MB/s.
+	HP0_read = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x200);  // Read Byte Count
+	HP0_write = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x210);  // Write Byte Count
+
+	HP1_read = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x220);
+	HP1_write = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x230);
+
+	HP2_read = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x240);
+	HP2_write = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x250);
+
+	HP3_read = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x260);
+	HP3_write = Xil_In32(XPAR_AXIPMON_0_BASEADDR+0x270);
+
+
+	HP0_read_dec = HP0_read*.000001;
+	HP0_write_dec = HP0_write*.000001;
+
+	HP1_read_dec = HP1_read*.000001;
+	HP1_write_dec = HP1_write*.000001;
+
+	HP2_read_dec = HP2_read*.000001;
+	HP2_write_dec = HP2_write*.000001;
+
+	HP3_read_dec = HP3_read*.000001;
+	HP3_write_dec = HP3_write*.000001;
+
+	VDMA_0_READ_VAL = HP0_read_dec;
+	VDMA_0_WRITE_VAL = HP0_write_dec;
+
+	VDMA_1_READ_VAL = HP1_read_dec;
+	VDMA_1_WRITE_VAL = HP1_write_dec;
+
+	VDMA_2_READ_VAL = HP2_read_dec;
+	VDMA_2_WRITE_VAL = HP2_write_dec;
+
+	VDMA_3_READ_VAL = HP3_read_dec;
+	VDMA_3_WRITE_VAL = HP3_write_dec;
+
+	printf("\r\n");
+
+	printf("AXI_VDMA1 Tx = %f \r\n", HP0_read_dec);
+	printf("AXI_VDMA1 Rx = %f \r\n", HP0_write_dec);
+
+	printf("AXI_VDMA2 Tx = %f \r\n", HP1_read_dec);
+	printf("AXI_VDMA2 Rx = %f \r\n", HP1_write_dec);
+
+	printf("AXI_VDMA3 Tx = %f \r\n", HP2_read_dec);
+	printf("AXI_VDMA3 Rx = %f \r\n", HP2_write_dec);
+
+	printf("AXI_VDMA4 Tx = %f \r\n", HP3_read_dec);
+	printf("AXI_VDMA4 Rx = %f \r\n", HP3_write_dec);
+
 }
